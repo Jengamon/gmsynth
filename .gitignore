@@ -1,0 +1,9 @@
+.pijul
+.DS_Store
+
+tmp/
+deps/
+*.clap
+zig-*/
+
+.ignore

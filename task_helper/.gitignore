@@ -1,0 +1,11 @@
+.DS_Store
+
+# Added by Cargo
+
+target/
+
+# Added by me
+
+Info.plist
+
+.ignore

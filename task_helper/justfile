@@ -1,0 +1,8 @@
+package := "gm-synth"
+display := uppercamelcase(package)
+version := "0.1"
+
+gen-plist-plugin: (gen-plist "plugin")
+
+gen-plist type:
+    cargo run -- gen-plist -p {{type}} {{package}} {{version}} -d {{display}} > Info.plist

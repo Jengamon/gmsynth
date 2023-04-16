@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
@@ -23,12 +24,45 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+
+    // Zig deps!
+    const glfw = b.dependency("glfw", .{
+        .target = target,
+        .optimize = optimize,
+    }).module("glfw");
+    lib.addModule("glfw", glfw);
+
+    // const objc = b.dependency("objc", .{
+    //     .target = target,
+    //     .optimize = optimize,
+    // }).module("objc");
+    // lib.addModule("objc", objc);
+
     // We use translate-c to "build" the clap/clap.h header, so
     // that we can add manual edits.
     // lib.addIncludePath("deps/clap/include");
     lib.addIncludePath("deps/wgpu/ffi");
     lib.addLibraryPath("deps/wgpu/target/release/");
-    lib.linkSystemLibrary("wgpu_native");
+    lib.linkSystemLibraryNeeded("wgpu_native");
+    // The sacrifices I make for windowing code...
+    if (builtin.os.tag == .linux) {
+        // We only link libC C code (wgpu-native is a Rust library)
+        // when compiling for Linux I think
+        lib.linkLibC();
+        const sessionType = std.os.getenv("XDG_SESSION_TYPE");
+        if (sessionType) |stype| {
+            if (std.mem.eql(u8, stype, "x11")) {
+                lib.linkSystemLibrary("X11");
+            } else if (std.mem.eql(u8, stype, "wayland")) {
+                lib.linkSystemLibrary("wayland-client");
+            } else {
+                @panic("Unsupported XDG_SESSION_TYPE");
+            }
+        } else {
+            // How are you even reading this?
+            @panic("Missing XDG_SESSION_TYPE");
+        }
+    }
 
     // This declares intent for the library to be installed into the standard
     // location when the user invokes the "install" step (the default step when

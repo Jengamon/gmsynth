@@ -2,7 +2,6 @@ const std = @import("std");
 const builtin = @import("builtin");
 const clap = @import("../clap.zig");
 const GmSynth = @import("./plugin.zig");
-const wgpu = @cImport(@cInclude("wgpu.h"));
 
 // TODO Support floating windows (self-created windows)
 // by using GLFW!
@@ -75,25 +74,6 @@ pub fn get_preferred_api(self: *const Self) PreferredApi {
         },
         .floating = self.config.prefer_floating,
     };
-}
-
-fn create_surface_from_window(instance: wgpu.WGPUInstance, window: *clap.clap_window_t) wgpu.WGPUSurface {
-    switch (builtin.os.tag) {
-        .macos => {
-            // We only support cocoa on MacOS, so yeah...
-            return wgpu.wgpuInstanceCreateSurface(
-                instance,
-                &.{ .label = null, .nextInChain = &.{
-                    .chain = .{
-                        .next = null,
-                        .sType = wgpu.WGPUSType_SurfaceDescriptorFromMetalLayer,
-                    },
-                    .layer = window.unnamed_0.cocoa,
-                } },
-            );
-        },
-        else => @panic("In progress"),
-    }
 }
 
 // Create and allocate resources for GUI (temporal resources, that depend on api

@@ -1,0 +1,14 @@
+.{
+    .name = "gmsynth",
+    .version = "0.1.0-alpha",
+    .dependencies = .{
+        .glfw = .{
+            .url = "https://github.com/hexops/mach-glfw/archive/871de9334926273b41c80b0fb13a74d8438eb4e7.tar.gz",
+            .hash = "1220001556975ddf8b5ccf05b292980f26ed2689f8033a3620e4bef740293013c24b",
+        },
+        // .objc = .{
+        //     .url = "https://github.com/mitchellh/zig-objc/archive/1e3537ab97144c5c0fe0979c12c92121912a5e89.tar.gz",
+        //     .hash = "1220f7cdca81c7718dc24565f2d7bf2912842a7d0a92072010dc01987d36b76fd94d",
+        // },
+    },
+}

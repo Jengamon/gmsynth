@@ -6,6 +6,7 @@ bundle_home  := display + ".clap"
 clap_version := "1.1.8"
 sdl_release  := "2.26.5"
 wgpu_version := "0.15.1.2"
+glfw_version := "3.3.8"
 
 [macos]
 package: clean

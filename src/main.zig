@@ -3,7 +3,7 @@ const testing = std.testing;
 const clap = @import("./clap.zig");
 const shared = @import("./shared.zig");
 
-// Plugin(s)
+// Plugin binding(s)
 const gmsynth = @import("./gmsynth.zig");
 
 // Override logging with host logging if available
@@ -21,7 +21,11 @@ pub const std_options = struct {
                 if (gmsynth.logFn(self, message_level, scope, format, args)) {
                     return;
                 } else |err| {
-                    std.debug.print("Failed to use gmsynth.logFn: {}\n", .{err});
+                    switch (err) {
+                        // Avoid noisy logs by ignoring this very common error
+                        error.NoHostLogExtension => {},
+                        else => std.debug.print("Failed to use gmsynth.logFn: {}\n", .{err}),
+                    }
                 }
             },
             else => {},

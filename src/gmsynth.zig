@@ -3,9 +3,6 @@ const clap = @import("./clap.zig");
 const shared = @import("./shared.zig");
 const GmSynth = @import("./gmsynth/plugin.zig");
 
-// Extensions
-const gui_ext = @import("./gmsynth/gui.zig");
-
 const Logger = GmSynth.Logger;
 
 const desc = clap.clap_plugin_descriptor_t{
@@ -91,7 +88,7 @@ fn create(host: *const clap.clap_host_t) !*const clap.clap_plugin_t {
             plugin_state = .{ .uninited = host };
         },
         .inited => |plug| {
-            std.log.err("attempted to create inited plugin", .{});
+            Logger.err("attempted to create inited plugin", .{});
             return plug.plugin;
         },
     }
@@ -104,26 +101,27 @@ fn get_host_extension(comptime T: type, host: *const clap.clap_host, ext: [*:0]c
     return @ptrCast(?*const T, @alignCast(@alignOf(T), host.get_extension.?(host, ext)));
 }
 
-pub fn get_state(plugin: *const clap.clap_plugin) *PlugData {
-    return @ptrCast(*PlugData, @alignCast(@alignOf(PlugData), plugin.plugin_data));
+pub fn get_state(plugin: *const clap.clap_plugin) PlugData {
+    return @ptrCast(*PlugData, @alignCast(@alignOf(PlugData), plugin.plugin_data)).*;
 }
 
 fn gmsynth_init(plugin: ?*const clap.clap_plugin) callconv(.C) bool {
     if (plugin) |cplug| {
         // var plug = get_self(cplug);
 
-        switch (get_state(cplug).*) {
-            PlugData.ready, PlugData.inited => {
+        switch (get_state(cplug)) {
+            .ready, .inited => {
                 return false;
             },
-            PlugData.uninited => |host| {
+            .uninited => |host| {
                 // Fetch host extensions
                 const host_data = GmSynth.HostData{
                     .host = host,
-                    .host_log = get_host_extension(clap.clap_host_log_t, host, &clap.CLAP_EXT_LOG),
-                    .host_thread_check = get_host_extension(clap.clap_host_thread_check_t, host, &clap.CLAP_EXT_THREAD_CHECK),
-                    .host_latency = null,
-                    .host_state = null,
+                    .host_log = get_host_extension(clap.clap_host_log, host, &clap.CLAP_EXT_LOG),
+                    .host_thread_check = get_host_extension(clap.clap_host_thread_check, host, &clap.CLAP_EXT_THREAD_CHECK),
+                    .host_latency = get_host_extension(clap.clap_host_latency, host, &clap.CLAP_EXT_LATENCY),
+                    .host_state = get_host_extension(clap.clap_host_state, host, &clap.CLAP_EXT_STATE),
+                    .host_gui = get_host_extension(clap.clap_host_gui, host, &clap.CLAP_EXT_GUI),
                 };
 
                 host_data.assert_main_thread() catch return false;
@@ -143,9 +141,10 @@ fn gmsynth_init(plugin: ?*const clap.clap_plugin) callconv(.C) bool {
 
 fn gmsynth_destroy(plugin: ?*const clap.clap_plugin) callconv(.C) void {
     if (plugin) |cplug| {
-        switch (get_state(cplug).*) {
-            PlugData.ready, PlugData.uninited => {},
-            PlugData.inited => |*plug| {
+        var state = get_state(cplug);
+        switch (state) {
+            .ready, .uninited => {},
+            .inited => |*plug| {
                 Logger.debug("Destroying GM Synth", .{});
                 plug.deinit();
 
@@ -158,10 +157,17 @@ fn gmsynth_destroy(plugin: ?*const clap.clap_plugin) callconv(.C) void {
 }
 
 fn gmsynth_get_extension(plugin: ?*const clap.clap_plugin, maybe_id: ?[*:0]const u8) callconv(.C) ?*const anyopaque {
-    _ = plugin;
     if (maybe_id) |id| {
-        if (std.mem.eql(u8, std.mem.span(id), &clap.CLAP_EXT_GUI)) {
-            return &gui_ext.ext;
+        if (plugin) |cplug| {
+            var state = get_state(cplug);
+            switch (state) {
+                .uninited, .ready => {
+                    return null;
+                },
+                .inited => |plug| {
+                    return plug.extension(std.mem.span(id));
+                },
+            }
         }
     }
     return null;
@@ -173,41 +179,107 @@ fn gmsynth_activate(
     min_frames_count: u32,
     max_frames_count: u32,
 ) callconv(.C) bool {
-    _ = max_frames_count;
-    _ = min_frames_count;
-    _ = sample_rate;
-    _ = plugin;
+    if (plugin) |cplug| {
+        var state = get_state(cplug);
+        switch (state) {
+            .uninited, .ready => {
+                return false;
+            },
+            .inited => |*plug| {
+                plug.host_data.assert_main_thread() catch return false;
+                plug.activate(sample_rate, min_frames_count, max_frames_count) catch |err| {
+                    Logger.err("Failed to activate: {}", .{err});
+                    return false;
+                };
+                return true;
+            },
+        }
+    }
 
-    return true;
+    return false;
 }
 
 fn gmsynth_deactivate(plugin: ?*const clap.clap_plugin) callconv(.C) void {
-    _ = plugin;
+    if (plugin) |cplug| {
+        var state = get_state(cplug);
+        switch (state) {
+            .uninited, .ready => {},
+            .inited => |*plug| {
+                plug.host_data.assert_main_thread() catch return;
+                plug.deactivate() catch |err| {
+                    Logger.err("Failed to deactivate: {}", .{err});
+                };
+            },
+        }
+    }
 }
 
 fn gmsynth_start_processing(plugin: ?*const clap.clap_plugin) callconv(.C) bool {
-    _ = plugin;
-    return true;
+    if (plugin) |cplug| {
+        var state = get_state(cplug);
+        switch (state) {
+            .uninited, .ready => {
+                return false;
+            },
+            .inited => |*plug| {
+                // TODO Maybe be more noisy?
+                plug.host_data.assert_audio_thread() catch return false;
+                return plug.start_processing();
+            },
+        }
+    }
+    return false;
 }
 
 fn gmsynth_stop_processing(plugin: ?*const clap.clap_plugin) callconv(.C) void {
-    _ = plugin;
+    if (plugin) |cplug| {
+        var state = get_state(cplug);
+        switch (state) {
+            .uninited, .ready => {},
+            .inited => |*plug| {
+                // TODO Maybe be more noisy?
+                plug.host_data.assert_audio_thread() catch return;
+                plug.stop_processing();
+            },
+        }
+    }
 }
 
 fn gmsynth_reset(plugin: ?*const clap.clap_plugin) callconv(.C) void {
-    _ = plugin;
+    if (plugin) |cplug| {
+        var state = get_state(cplug);
+        switch (state) {
+            .uninited, .ready => {},
+            .inited => |*plug| {
+                // TODO Maybe be more noisy?
+                plug.host_data.assert_audio_thread() catch return;
+                plug.reset();
+            },
+        }
+    }
 }
 
 fn gmsynth_process(plugin: ?*const clap.clap_plugin, maybe_process: ?*const clap.clap_process_t) callconv(.C) clap.clap_process_status {
     if (plugin) |cplug| {
-        switch (get_state(cplug).*) {
-            PlugData.ready, PlugData.uninited => {
+        var state = get_state(cplug);
+        switch (state) {
+            .ready, .uninited => {
                 // Misbehavior: calling process on non-inited
                 return clap.CLAP_PROCESS_ERROR;
             },
-            PlugData.inited => |*plug| {
+            .inited => |*plug| {
                 if (maybe_process) |process| {
-                    return plug.plugin_process(process);
+                    const res = plug.plugin_process(process) catch |err| {
+                        Logger.err("Failed to process: {}", .{err});
+                        return clap.CLAP_PROCESS_ERROR;
+                    };
+
+                    return switch (res) {
+                        .Continue => clap.CLAP_PROCESS_CONTINUE,
+                        .ContinueIfNotQuiet => clap.CLAP_PROCESS_CONTINUE_IF_NOT_QUIET,
+                        .Tail => clap.CLAP_PROCESS_TAIL,
+                        .Sleep => clap.CLAP_PROCESS_SLEEP,
+                    };
                 }
             },
         }
@@ -217,9 +289,9 @@ fn gmsynth_process(plugin: ?*const clap.clap_plugin, maybe_process: ?*const clap
 
 fn gmsynth_on_main_thread(plugin: ?*const clap.clap_plugin) callconv(.C) void {
     if (plugin) |cplug| {
-        switch (get_state(cplug).*) {
-            PlugData.ready, PlugData.uninited => {},
-            PlugData.inited => |*plug| {
+        switch (get_state(cplug)) {
+            .ready, .uninited => {},
+            .inited => |*plug| {
                 plug.host_data.assert_main_thread() catch return;
                 plug.on_main_thread();
             },

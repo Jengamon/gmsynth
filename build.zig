@@ -26,9 +26,9 @@ pub fn build(b: *std.Build) void {
     // We use translate-c to "build" the clap/clap.h header, so
     // that we can add manual edits.
     // lib.addIncludePath("deps/clap/include");
-    lib.addIncludePath("deps/sdl/out/include");
-    lib.addLibraryPath("deps/sdl/out/lib");
-    lib.linkSystemLibrary("SDL2");
+    lib.addIncludePath("deps/wgpu/ffi");
+    lib.addLibraryPath("deps/wgpu/target/release/");
+    lib.linkSystemLibrary("wgpu_native");
 
     // This declares intent for the library to be installed into the standard
     // location when the user invokes the "install" step (the default step when

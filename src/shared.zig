@@ -15,12 +15,8 @@ pub const PluginEntry = struct {
 };
 
 // TODO Maybe switch the allocator, we put it here
-// so that we can share the same allocator.
-
-// We don't use the thread-safe mode (yet), because
-// we aren't on the thread pool, and audio thread *must*
-// not allocate. We might move to thread pool, so we would need
-// .thread_safe = true,
+// so that we can share the same allocator between
+// multiple files (plugins).
 pub var gpa = std.heap.GeneralPurposeAllocator(.{
     .stack_trace_frames = 4,
 }){};

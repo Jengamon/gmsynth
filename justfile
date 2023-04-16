@@ -5,6 +5,7 @@ display      := uppercamelcase(package)
 bundle_home  := display + ".clap"
 clap_version := "1.1.8"
 sdl_release  := "2.26.5"
+wgpu_version := "0.15.1.2"
 
 [macos]
 package: clean
@@ -38,7 +39,7 @@ clean-deps:
     rm -Rf deps/
     mkdir deps
 
-download-deps: clean-tmp clean-deps (download-sdl sdl_release)
+download-deps: clean-tmp clean-deps (download-wgpu wgpu_version)
 
 download-clap-latest: (download-clap clap_version)
 
@@ -50,13 +51,22 @@ download-clap version: && build-clap
 build-clap:
     zig translate-c deps/clap/include/clap/clap.h > src/clap.zig
 
-download-sdl release: && build-sdl
-    curl -L -o tmp/sdl.tar.gz https://github.com/libsdl-org/SDL/archive/refs/tags/release-{{release}}.tar.gz
-    mkdir deps/sdl
-    tar xzvf tmp/sdl.tar.gz -C deps/sdl/ --strip-components=1
+download-wgpu version: && build-wgpu
+    mkdir deps/wgpu
+    @#Fuck git submodules
+    git clone --recurse-submodules https://github.com/gfx-rs/wgpu-native.git deps/wgpu/
+    cd deps/wgpu && git checkout v{{version}}
 
-build-sdl:
-    mkdir deps/sdl/build
-    cd deps/sdl/build && cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../out
-    cd deps/sdl/build && cmake --build . --config Release --parallel
-    cd deps/sdl/build && cmake --install . --config Release
+build-wgpu:
+    cd deps/wgpu && make lib-native-release
+
+# download-sdl release: && build-sdl
+#     curl -L -o tmp/sdl.tar.gz https://github.com/libsdl-org/SDL/archive/refs/tags/release-{{release}}.tar.gz
+#     mkdir deps/sdl
+#     tar xzvf tmp/sdl.tar.gz -C deps/sdl/ --strip-components=1
+
+# build-sdl:
+#     mkdir deps/sdl/build
+#     cd deps/sdl/build && cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../out
+#     cd deps/sdl/build && cmake --build . --config Release --parallel
+#     cd deps/sdl/build && cmake --install . --config Release

@@ -172,9 +172,15 @@ pub const PluginProcessStatus = enum {
     Tail,
 };
 
-pub fn plugin_process(self: *Self, process: *const clap.clap_process_t) !PluginProcessStatus {
+// Notice how std.mem.Allocator.Error is not a part of this error enum
+// Keep it that way.
+// You shouldn't be allocating here (or on start/stop_processing)
+pub const PluginProcessError = error{};
+
+pub fn plugin_process(self: *Self, process: *const clap.clap_process_t) PluginProcessError!PluginProcessStatus {
     _ = self;
     _ = process;
+    // NOTE Error isn't meant for allocation, it means to throw out the buffer
     return PluginProcessStatus.Continue;
 }
 

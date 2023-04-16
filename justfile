@@ -71,3 +71,15 @@ build-wgpu:
 #     cd deps/sdl/build && cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../out
 #     cd deps/sdl/build && cmake --build . --config Release --parallel
 #     cd deps/sdl/build && cmake --install . --config Release
+
+upload editor="hx": (upload-pijul editor) (upload-git editor)
+
+upload-pijul $EDITOR:
+    pijul add -r .
+    pijul record
+    pijul push
+
+upload-git $EDITOR:
+    git add .
+    git commit 
+    git push
